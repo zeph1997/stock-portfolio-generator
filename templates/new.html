@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IS453 RoboFund</title>
+
+    <script src="https://cdn.anychart.com/releases/v8/js/anychart-base.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/v8/js/anychart-ui.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/v8/js/anychart-exports.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/v8/js/anychart-stock.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/v8/js/anychart-data-adapter.min.js"></script>
+    <link href="https://cdn.anychart.com/releases/v8/css/anychart-ui.min.css" type="text/css" rel="stylesheet">
+    <link href="https://cdn.anychart.com/releases/v8/fonts/css/anychart-font.min.css" type="text/css" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://unpkg.com/vue@next"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> 
+    <style type="text/css">
+        html,
+        body,
+        #container {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          padding: 0;
+        }
+
+        .flex-container {
+            margin-left:30px;
+            display: flex;
+        }
+
+        .flex-child {
+            flex: 1;
+        }  
+
+        .flex-child:first-child {
+            margin-left: 20px;
+            margin-right: 20px;
+        }  
+
+        .center {
+            margin: auto;
+            text-align: center;
+        }
+        td {
+            padding-left: 7.5px;
+            padding-right: 7.5px;
+            height: 40px;
+            width: 25%;
+        }
+
+        .header {
+            padding: 60px;
+            text-align: center;
+            color: black;
+            font-size: 20px;
+            font-family: 'Trocchi', serif
+        }
+        
+        form {
+            max-width: 920px;
+            margin: 30px auto;
+            background: white;
+            text-align: left;
+            padding: 50px;
+            border-radius: 20px;
+        }
+
+        label {
+            color: #aaa;
+            display: inline-block;
+            margin: 25px 0 15px;
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        input, select {
+            display: block;
+            padding: 10px 6px;
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+            border-bottom: 1px solid #ddd;
+            color: #555;
+        }
+        input[type="checkbox"] {
+            display: inline-block;
+            width: 16px;
+            margin: 0 5px 0 20px;
+            position: relative;
+            top: 2px;
+        }
+        .pill {
+            display: inline-block;
+            margin: 20px 10px 0 0;
+            padding: 6px 12px;
+            background: #eee;
+            border-radius: 20px;
+            font-size: 12px;
+            letter-spacing: 1px;
+            font-weight: bold;
+            color: #777;
+            cursor: pointer;
+        }
+        button {
+            background: #CBC3E3;
+            border: 0;
+            padding: 10px 20px;
+            margin-top: 20px;
+            color: white;
+            border-radius: 20px;
+        }
+        .submit {
+            text-align: center;
+        }
+        .error {
+            color: #ff0062;
+            margin-top: 10px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container"></div>
+    <div id="app">
+        <form2></form2>
+        <div v-if="sectorSenti.length > 0" class="flex-container">
+            <h3>Sector Sentiment</h3>
+            <ul>
+                <li v-for="senti in sectorSenti">
+                    {% raw %}{{ senti[0] }}: {{senti[1].toFixed(4)}} {% endraw %}
+                </li>
+            </ul>
+        </div>
+        <!-- <div v-if="showCharts"> -->
+            <div class="flex-container">
+            <table class="flex-child left table">
+                <thead>
+                    <tr>
+                        <th>Notable Sector Pairs</th>
+                        <th>Correlation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="corr in correlations" >
+                        <td>{% raw %}{{corr[0]}} - {{corr[1]}}{% endraw %}</td>
+                        <td>{% raw %}{{corr[2].toFixed(2)}}{% endraw %}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <table class="flex-child right table">
+                <thead>
+                    <tr>
+                        <th>Gold & Bond Pairs</th>
+                        <th>Correlation (3 day time-shifted)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="corr in bgcorrelations">
+                        <td>{% raw %}{{corr[0]}} - {{corr[1]}}{% endraw %}</td>
+                        <td>{% raw %}{{corr[2].toFixed(2)}}{% endraw %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div v-if="sharpeRatio != 0 && selectedStocks != []" >
+            <div class="header">
+                <h1>Expected Returns</h1>
+                {% raw %}{{portfolioReturns * 100 }}%{% endraw %}
+                <h2>Sharpe Ratio</h2>
+                {% raw %} {{sharpeRatio}} {% endraw %}
+                <h2>Expected Volatility</h2>
+                {% raw %} {{stdev}} {% endraw %}
+            </div>
+            <div class="flex-container">
+
+                <div class="flex-child left">
+                    <barchart v-bind:portfolio="portfolioComponents"></barchart>
+                </div>
+                <div class="flex-child right">
+                    <piechart v-bind:portfolio="portfolioComponents"></piechart>
+                </div> 
+            </div>
+            <br>
+            <chart2  v-for="(ticker,index) in selectedStocks" v-bind:id="ticker" v-bind:ticker="ticker" index="index" v-bind:predicted="predictedValues[ticker]"></chart2>
+            <div>
+                <div class="header">
+                    <h1>Stocks Left Out</h1>
+                </div>
+                <div class="flex-container">
+                    <table class="flex-child table">
+                        <thead>
+                            <tr>
+                                <th>Stock Ticker</th>
+                                <th>Expected Returns</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="stock in rejectedStocks" >
+                                <td>{% raw %}{{stock[0]}}{% endraw %}</td>
+                                <td>{% raw %}{{stock[1].toFixed(2) * 100 }}%{% endraw %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        anychart.onDocumentReady(function () {
+          anychart.data.loadCsvFile(
+            'https://raw.githubusercontent.com/patriciafzy/patriciafzy/master/HistoricalPrices.csv',
+            function (data) {
+              var dataTable = anychart.data.table();
+              dataTable.addData(data);
+              var mapping = dataTable.mapAs({
+                open: 1,
+                high: 2,
+                low: 3,
+                close: 4
+              }); 
+    
+              var chart = anychart.stock();
+    
+              var plot = chart.plot(0);
+              plot.yGrid(true).xGrid(true).yMinorGrid(true).xMinorGrid(true);
+    
+              plot
+                .ema(dataTable.mapAs({ value: 4 }))
+                .series()
+                .stroke('1.5 #455a64');
+    
+              var series = plot.candlestick(mapping);
+              series.name('S&P 500 (SPX)');
+              series.legendItem().iconType('rising-falling');
+    
+              chart.scroller().candlestick(mapping);
+    
+              chart.selectRange('2020-01-01', '2021-01-01');
+    
+              chart.container('container');
+              chart.draw();
+              
+              var rangePicker = anychart.ui.rangePicker();
+              rangePicker.render(chart);
+    
+              var rangeSelector = anychart.ui.rangeSelector();
+              rangeSelector.render(chart);
+            }
+          );
+        });
+      
+    </script>
+
+    <script>
+        const app = Vue.createApp({
+            data() {
+                return {
+                    correlations: [],
+                    bgcorrelations:[],
+                    selectedStocks: [],
+                    portfolioComponents: {},
+                    predictedValues: {},
+                    sharpeRatio: 0,
+                    portfolioReturns:0,
+                    stdev:0,
+                    rejectedStocks:[],
+                    pendingRejectStocks:[],
+                    sectorSenti:[]
+                }
+            },
+            async mounted() {
+                var self = this;
+                axios.get('http://127.0.0.1:5000/generate-portfolio_get_cross_corr')
+                .then(function (response) {
+                    console.log("cross corr")
+                    console.log(response)
+                    self.correlations = response.data
+                }).catch(error => {
+                    console.log("Error");
+                })
+                axios.get('http://127.0.0.1:5000/generate-portfolio_get_cross_corr_bond_gold')
+                .then(function (response) {
+                    console.log("gold bond cross corr")
+                    console.log(response)
+                    self.bgcorrelations = response.data
+                }).catch(error => {
+                    console.log("Error");
+                })
+                axios.get('http://127.0.0.1:5000/generate-portfolio_get_sector_sentiment')
+                .then(function (response) {
+                    console.log("all sentiment score")
+                    console.log(response)
+                    self.sectorSenti = response.data
+                }).catch(error => {
+                    console.log("Error");
+                })                
+            }
+
+        })
+
+        app.component('form2', { 
+            props: ['name', 'price'], 
+            template: ` <form @submit.prevent="processForm" class="form-group">
+
+                <label >Sector</label>
+                <div>
+                    <div class="form-check form-check-inline">
+                    <input type="checkbox" v-model="sector" value="Basic Materials" class="form-check-input">
+                    Basic Materials
+                    
+                    <input type="checkbox" v-model="sector" value="Consumer Cyclical" class="form-check-input">
+                    Consumer Cyclical
+                    
+                    <input type="checkbox" v-model="sector" value="Financial Services" class="form-check-input">
+                    Financial Services
+                    
+                    <input type="checkbox" v-model="sector" value="Real Estate" class="form-check-input">
+                    Real Estate
+                    </div>
+                    <div class="form-check form-check-inline">
+                    
+                    <input type="checkbox" v-model="sector" value="Consumer Defensive " class="form-check-input">
+                    Consumer Defensive 
+                    
+                    <input type="checkbox" v-model="sector" value="Healthcare" class="form-check-input">
+                    Healthcare
+                    
+                    <input type="checkbox" v-model="sector" value="Utilities" class="form-check-input">
+                    Utilities
+                    
+                    <input type="checkbox" v-model="sector" value="Communication Services" class="form-check-input">
+                    Communication Services 
+                    </div>
+                    <div class="form-check form-check-inline">
+                    <input type="checkbox" v-model="sector" value="Energy" class="form-check-input">
+                    Energy
+                    
+                    <input type="checkbox" v-model="sector" value="Industrials" class="form-check-input">
+                    Industrials
+                    
+                    <input type="checkbox" v-model="sector" value="Technology" class="form-check-input">
+                    Technology
+                    </div>
+
+                </div>
+
+                <label>Expected Annualised Gain (%):</label>
+                <input type="number" pattern="[0-9]{2}" min="0" max="100" v-model="expectedgain" required>
+
+                <label>Risk Appetite (1 - 10):</label>
+                <input type="number" pattern="[0-9]{2}" min="0" max="10" v-model="riskappetite" required>
+
+                <label>Ideal number of stocks (1 - 5):</label>
+                <input type="number" pattern="[0-9]{2}" min="1" max="5" v-model="idealstocks" required>
+
+                <label>Time Horizon (Years):</label>
+                <input type="number" pattern="[0-9]{2}" min="1" max="10" v-model="timehorizon" required>
+                <br>
+
+                <div class="submit">
+                    <button>Get Portfolio!</button>
+                    </div></form>`,
+            data() {
+                return {
+                    sector: [],
+                    expectedgain: '',
+                    riskappetite: '',
+                    idealstocks: '',
+                    timehorizon: '',
+                    originalList: [],
+                    refineList: []
+                }
+            },
+            methods: {
+                handleSubmit() {
+                }, 
+                processForm: async function() {
+                    console.log({sector: this.sector, expectedgain: this.expectedgain, riskappetite: this.riskappetite,
+                    idealstocks: this.idealstocks, timehorizon: this.timehorizon*365
+                    });
+                    var self = this;
+                    // for (var msector in this.sector) {
+                    //     console.log(this.sector[msector]);
+                    //     var score = await axios.post('http://127.0.0.1:5000/generate-portfolio_get_sector_sentiment',{sector:this.sector[msector]})
+                    //     this.sectorSenti.push([this.sector[msector],score])
+                    //     console.log(score)
+                    // }
+                    axios.post('http://127.0.0.1:5000/generate-portfolio_get_stocks', {
+                        sector: self.sector,
+                        num_stocks:self.idealstocks,
+                        time_horizon:self.timehorizon*365
+                    }).then(function (response) {
+                        console.log(response);
+                        return axios.post('http://127.0.0.1:5000/generate-portfolio_get_stocks_finviz', {
+                            stocks: response.data
+                        })
+                    }).then(function (response) {
+                        console.log("back from finviz, going to refine");
+                        console.log(response);
+                        originalList = response.data;
+                        return axios.post('http://127.0.0.1:5000/generate-portfolio_get_refined_stocks', {
+                            stocks: response.data
+                        })
+                    }).then(function (response) {
+                        console.log("back from refine, going to predict");
+                        console.log(response);
+                        
+                        console.log(self.timehorizon)
+                        return axios.post('http://127.0.0.1:5000/generate-portfolio_predict', {
+                            stocks: response.data,
+                            time_horizon: self.timehorizon*365,
+                            num_stocks: self.idealstocks
+                        })
+                    }).then(function (response) {
+                        console.log("back from predict, going to optimise");
+                        console.log(response);
+                        self.$parent.predictedValues = response.data.predicted_values
+                        for (var key of response.data.stocks_with_returns){
+                            console.log(key);
+                            self.$parent.pendingRejectStocks.push(key[0]);
+                            self.$parent.rejectedStocks.push(key);
+                        }
+                        console.log(self.$parent.rejectedStocks);
+                        return axios.post('http://127.0.0.1:5000/generate-portfolio_optimise', {
+                            stocks_with_returns: response.data,
+                            time_horizon: self.timehorizon * 365,
+                            predicted_values: response.data.predicted_values,
+                            expected_annualised_gains: self.expectedgain,
+                            risk: self.riskappetite,
+                            num_stocks: self.idealstocks
+                        })
+                    }).then(function (response) {
+                        console.log("back from optimise, we done");
+                        console.log(response);
+                        self.$parent.portfolioReturns = response.data.ret.toFixed(4);
+                        self.$parent.sharpeRatio = response.data.sharpe.toFixed(4);
+                        self.$parent.stdev = response.data.stdev.toFixed(4)
+                        delete response.data.sharpe;
+                        delete response.data.ret;
+                        delete response.data.stdev; 
+                        self.$parent.portfolioComponents = response.data;
+                        for (var key in response.data){
+                            console.log("key: ")
+                            console.log(key)
+                            self.$parent.selectedStocks.push(key)
+                            if (self.$parent.pendingRejectStocks.includes(key)){
+                                if (self.$parent.pendingRejectStocks.indexOf(key) > -1){
+                                    self.$parent.rejectedStocks.splice(self.$parent.pendingRejectStocks.indexOf(key), 1)
+                                    self.$parent.pendingRejectStocks.splice(self.$parent.pendingRejectStocks.indexOf(key), 1);
+                                }
+                            }
+                        }
+                        
+                        
+                    })
+                    .catch(error => {
+                        console.log(error);
+                    })
+                }, 
+            },
+            async mounted() {
+            }
+        })
+
+        app.component('chart2', {
+            props: ['ticker', 'index','predicted'],
+            template:`<div class="chart-container" style="height:1000px; width:1500px">
+        <canvas v-bind:id="'canvas'+ticker" ></canvas>
+    </div>`,
+            data: () => ({
+
+            }),
+            async mounted () {               
+                const ctx = document.getElementById('canvas' + this.ticker).getContext('2d')
+                var self = this;
+                // eslint-disable-next-line no-undef,no-unused-vars
+                console.log("ticker")
+                console.log(this.ticker)
+                
+                var predValues = JSON.parse(JSON.stringify(this.predicted));
+                var todaydate = new Date();
+                var endDate = new Date();
+                endDate.setDate(todaydate.getDate()+predValues.length);
+                var datesfunc = function(s,e) {for(var a=[],d=new Date(s);d<=e;d.setDate(d.getDate()+1)){ a.push(new Date(d));}return a;}
+                var mydates = datesfunc(todaydate,endDate);
+                mydates = mydates.map((v)=>v.toISOString().slice(0,10))
+                console.log(mydates)
+                const Chart_2 = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: mydates, 
+                    datasets: [
+                    {
+                        data: JSON.parse(JSON.stringify(this.predicted)),
+                        label: 'Predicted Values for ' + this.ticker,
+                        borderColor: '#7367F0'
+                    }
+                    ]
+                }
+                // options: {
+                //     responsive: false,
+                //     scales: {
+                //     xAxes: [
+                //         {
+                //         type: 'time',
+                //         }
+                //     ],
+                //     yAxes: [
+                //         {
+                //         ticks: {
+                //             // eslint-disable-next-line no-unused-vars
+                //             callback (value, index, values) {
+                //             return `${value}`
+                //             }
+                //         }
+                //         }
+                //     ]
+                //     }
+                // }
+                })
+            }
+        })
+
+        app.component('piechart' ,{
+            props: ['portfolio'],
+            template: `<div class="chart-container">
+            <canvas id="portfoliopie"  width="500" height="500"></canvas>    
+            </div>`, 
+            data: () => ({
+            }),
+
+            async mounted() {
+                // let result = await axios.get('https://api.wirespec.dev/wirespec/stackoverflow/fetchchartdataforvuejs')
+                // this.points = result.data.challenge
+
+                var self = this;
+                const ctx = document.getElementById('portfoliopie').getContext('2d') 
+                // eslint-disable-next-line no-undef,no-unused-vars 
+                var portLabel = [];
+                var portData = [];
+                for (let [key, value] of Object.entries(this.portfolio)) {
+                    portLabel.push(key);
+                    portData.push(value * 100);
+                }
+                new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: portLabel,
+                        datasets: [
+                        {
+                            data: portData,
+                            label: 'Portfolio Composition',
+                            backgroundColor: ["#A9B5D9", "#F2C4C4", "#F2A477", "#5F9595", "#F0BC68", "#C4D7D1", "#D1EBD8", "#F2C4DE", "#C3B1E1"]
+                        }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        mainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Portfolio Composition Pie Chart'
+                            }
+                        }
+                    },  
+                })
+            }
+        })
+        
+        app.component('barchart' ,{
+            props: ['portfolio'],
+            template: `<div class="chart-container">
+            <canvas id="portfoliobar"  width="500" height="500"></canvas>    
+            </div>`, 
+            data: () => ({
+            }),
+
+            async mounted() {
+                // let result = await axios.get('https://api.wirespec.dev/wirespec/stackoverflow/fetchchartdataforvuejs')
+                // this.points = result.data.challenge
+
+                // const data = this.points
+                var self = this;
+                const ctx = document.getElementById('portfoliobar').getContext('2d') 
+                var portLabel = [];
+                var portData = [];
+                for (let [key, value] of Object.entries(this.portfolio)) {
+                    portLabel.push(key);
+                    portData.push(value * 100);
+                }
+                // eslint-disable-next-line no-undef,no-unused-vars 
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: portLabel, 
+                        datasets: [
+                            { 
+                                data: portData,
+                                backgroundColor: ["#A9B5D9", "#F2C4C4", "#F2A477", "#5F9595", "#F0BC68", "#C4D7D1", "#D1EBD8", "#F2C4DE", "#C3B1E1"],
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Portfolio Composition Bar Chart'
+                            }
+                        }
+                    },
+                })
+            }
+        })         
+          
+        app.mount('#app')
+    </script>
+
+</body>
+</html>
